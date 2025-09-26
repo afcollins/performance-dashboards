@@ -82,6 +82,12 @@ spec:
         app: dittybopper
       name: dittybopper
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/infra
+        operator: Exists
       containers:
       - name: dittybopper
         imagePullPolicy: Always
