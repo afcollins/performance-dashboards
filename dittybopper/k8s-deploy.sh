@@ -112,7 +112,9 @@ fi
 # Get environment values
 echo ""
 echo -e "\033[32mGetting environment vars...\033[0m"
-export PROMETHEUS_URL=http://$($k8s_cmd get endpoints -n prometheus prometheus-server -o jsonpath="{.subsets[0].addresses[0].ip}"):$($k8s_cmd get endpoints -n prometheus prometheus-server -o jsonpath="{.subsets[0].ports[0].port}")
+#export PROMETHEUS_URL=http://$($k8s_cmd get endpoints -n prometheus prometheus-server -o jsonpath="{.subsets[0].addresses[0].ip}"):$($k8s_cmd get endpoints -n prometheus prometheus-server -o jsonpath="{.subsets[0].ports[0].port}")
+# TODO Delete this before committing. Local testing only
+export PROMETHEUS_URL=http://10.0.0.24:9090
 echo "Prometheus URL is: ${PROMETHEUS_URL}"
 
 function namespace() {
