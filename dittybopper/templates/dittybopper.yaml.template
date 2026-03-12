@@ -52,18 +52,6 @@ spec:
         - name: RENDERING_TZ
           value: "UTC"
 ---
-#FIXME: This is OCP-specific
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: dittybopper
-  namespace: $namespace
-spec:
-  to:
-    name: dittybopper
-  port:
-    targetPort: 3000
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

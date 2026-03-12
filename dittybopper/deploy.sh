@@ -120,15 +120,11 @@ fi
 #FIXME: This is OCP-Specific; needs updating to support k8s
 echo ""
 echo -e "\033[32mGetting environment vars...\033[0m"
-export PROMETHEUS_URL="https://prometheus-k8s.openshift-monitoring:9091"
-export PROMETHEUS_BEARER=$($k8s_cmd create token -n openshift-monitoring prometheus-k8s --duration 240h || $k8s_cmd sa get-token -n openshift-monitoring prometheus-k8s || $k8s_cmd sa new-token -n openshift-monitoring prometheus-k8s)
+#export PROMETHEUS_URL="https://prometheus-k8s.openshift-monitoring:9091"
+#export PROMETHEUS_BEARER=$($k8s_cmd create token -n openshift-monitoring prometheus-k8s --duration 240h || $k8s_cmd sa get-token -n openshift-monitoring prometheus-k8s || $k8s_cmd sa new-token -n openshift-monitoring prometheus-k8s)
+# TODO Delete this before committing. Local testing only
+export PROMETHEUS_URL=http://10.0.0.24:9090
 echo "Prometheus URL is: ${PROMETHEUS_URL}"
-if [[ -n ${PROMETHEUS_BEARER} ]]; then
-  echo "Prometheus bearer token collected."
-else
-  echo "ERROR: Prometheus bearer token is not collected."
-  exit 1
-fi
 
 # Identify Hypershift Management Cluster
 if [ $($k8s_cmd get crd hostedclusters.hypershift.openshift.io 2>/dev/null | wc -l) -ne 0 ] ; then
