@@ -25,7 +25,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('total_avg_rps')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $all_uuids AND config.termination.keyword: $termination AND ocpMajorVersion.keyword: $ocpMajorVersion')
       + elasticsearch.withTimeField('timestamp'),
@@ -52,7 +52,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('total_avg_rps')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid AND config.termination.keyword: $termination AND ocpMajorVersion.keyword: $ocpMajorVersion')
       + elasticsearch.withTimeField('timestamp'),
@@ -79,7 +79,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('$latency_metric')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
 
       ])
       + elasticsearch.withQuery('uuid.keyword: $all_uuids AND config.termination.keyword: $termination AND ocpMajorVersion.keyword: $ocpMajorVersion')
@@ -93,7 +93,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withHide(false)
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.RawData.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.RawData.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.RawData.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid')
       + elasticsearch.withTimeField('timestamp'),
@@ -122,7 +122,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('total_avg_rps')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid AND config.termination.keyword: $termination')
       + elasticsearch.withTimeField('timestamp'),
@@ -151,7 +151,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('$latency_metric')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid AND config.termination.keyword: $termination')
       + elasticsearch.withTimeField('timestamp'),
@@ -179,7 +179,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('total_avg_rps')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid AND config.termination.keyword: $termination')
       + elasticsearch.withTimeField('timestamp'),
@@ -208,7 +208,7 @@ local elasticsearch = g.query.elasticsearch;
       + elasticsearch.withMetrics([
         elasticsearch.metrics.MetricAggregationWithSettings.Average.withField('$latency_metric')
         + elasticsearch.metrics.MetricAggregationWithSettings.Average.withId('1')
-        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType()
+        + elasticsearch.metrics.MetricAggregationWithSettings.Average.withType(),
       ])
       + elasticsearch.withQuery('uuid.keyword: $uuid AND config.termination.keyword: $termination')
       + elasticsearch.withTimeField('timestamp'),
