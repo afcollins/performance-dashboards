@@ -8,7 +8,7 @@ TEMPLATESDIR = templates
 ASSETS := $(wildcard assets/**/*.libsonnet)
 OUTPUTDIR = rendered
 ALLDIRS = $(BINDIR) $(OUTPUTDIR)
-SYNCER_IMG_TAG ?= quay.io/cloud-bulldozer/dittybopper-syncer:latest
+SYNCER_IMG_TAG ?= quay.io/afcollins/dittybopper-syncer:go-sdk-custom-amd64
 PLATFORM = linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
 
 # Get all templates at $(TEMPLATESDIR)

@@ -112,7 +112,7 @@ func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 		GridPos(dashboard.GridPos{X: 0, Y: 0, W: 24, H: 1}).
 		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percent",
 			dashboard.GridPos{X: 0, Y: 2, W: 12, H: 8},
-			promQuery(`sum( rate( (node_cpu_seconds_total{ mode != "idle" } * on (instance) group_left label_replace( kube_node_role{ role = "worker"} , "instance" , "$1" , "node" ,"(.*)") )[$interval:] ) ) by (instance) * 100`, "{{instance}}"),
+			promQuery(`instance:node_cpu:rate:sum`, "{{instance}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane CPU Usage", "percent",
 			dashboard.GridPos{X: 12, Y: 2, W: 12, H: 8},
@@ -271,8 +271,8 @@ func ocpMonitoringStackRow() *dashboard.RowBuilder {
 		)).
 		WithPanel(genericLegendTimeSeries("Prometheus Replica RSS", "bytes",
 			dashboard.GridPos{X: 12, Y: 2, W: 12, H: 8},
-			promQuery(`sum(container_memory_rss{pod="prometheus-k8s-1",namespace!="",name!="",container="prometheus"}) by (pod)`, "{{pod}}"),
-			promQuery(`sum(container_memory_rss{pod="prometheus-k8s-0",namespace!="",name!="",container="prometheus"}) by (pod)`, "{{pod}}"),
+			promQuery(`sum(container_memory_rss{pod="prometheus-k8s-1",namespace!="",name!="",container="prometheus"}) by (pod,node)`, "{{pod}} - {{node}}"),
+			promQuery(`sum(container_memory_rss{pod="prometheus-k8s-0",namespace!="",name!="",container="prometheus"}) by (pod,node)`, "{{pod}} - {{node}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("metrics-server/prom-adapter CPU", "percent",
 			dashboard.GridPos{X: 0, Y: 10, W: 12, H: 8},
