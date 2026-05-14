@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/grafana/grafana-foundation-sdk/go/cog"
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
+	"github.com/grafana/grafana-foundation-sdk/go/prometheus"
 	mg "github.com/kube-burner/metrics-generator/pkg/metrics"
 )
 
@@ -98,6 +99,7 @@ func buildOCPPerformanceDashboard() *dashboard.DashboardBuilder {
 				intervalOption("5m"),
 			}),
 		).
+		WithRow(ocpSnrNhcRow()).
 		// Row: Cluster-at-a-Glance
 		WithRow(ocpClusterAtAGlanceRow()).
 		// Row: OVN
@@ -118,6 +120,49 @@ func buildOCPPerformanceDashboard() *dashboard.DashboardBuilder {
 		WithRow(ocpInfraRow()).
 		// Row: Stackrox
 		WithRow(ocpStackroxRow())
+}
+
+func ocpSnrNhcRow() cog.Builder[dashboard.RowPanel] {
+	return dashboard.NewRowBuilder("SNR / NHC Panels").
+		Collapsed(true).
+		GridPos(dashboard.GridPos{X: 0, Y: 0, W: 24, H: 1}).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU stats", "percent",
+			dashboard.GridPos{X: 0, Y: 2, W: 12, H: 8},
+			wrkldAvailCPU(mg.AggAvg),
+			wrkldAvailCPU(mg.AggMax),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem stats", "bytes",
+			dashboard.GridPos{X: 12, Y: 1, W: 12, H: 8},
+			wrkldAvailMem(mg.AggAvg),
+			wrkldAvailMem(mg.AggMax),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU sum", "percent",
+			dashboard.GridPos{X: 0, Y: 2, W: 12, H: 8},
+			wrkldAvailCPU(mg.AggSum),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem sum", "bytes",
+			dashboard.GridPos{X: 12, Y: 1, W: 12, H: 8},
+			wrkldAvailMem(mg.AggAvg),
+		))
+}
+
+func wrkldAvailCPU(newConst mg.AggFunc) *prometheus.DataqueryBuilder {
+	wrkldAvailCPU := promQuery(
+		mg.Q(mg.MetricContainerCPU, `namespace="openshift-workload-availability",container!="POD",name!=""`).
+			Rate(intervalVar).Multiply("100").
+			Agg(newConst, mg.GroupByContainer).
+			String(),
+		"{{container}} - "+string(newConst))
+	return wrkldAvailCPU
+}
+
+func wrkldAvailMem(newConst mg.AggFunc) *prometheus.DataqueryBuilder {
+	wrkldAvailMem := promQuery(
+		mg.Q(mg.MetricContainerMemoryRSS, `namespace="openshift-workload-availability",container!="POD",name!=""`).
+			Agg(newConst, mg.GroupByContainer).
+			String(),
+		"{{container}} - "+string(newConst))
+	return wrkldAvailMem
 }
 
 // Row: Cluster-at-a-Glance
