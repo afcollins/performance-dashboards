@@ -255,13 +255,13 @@ func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 				mg.Raw("node_disk_reads_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					Rate(intervalVar).String(),
+					RateSubquery(intervalVar).String(),
 				"{{instance}} - {{ device }} - read"),
 			promQuery(
 				mg.Raw("node_disk_writes_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					Rate(intervalVar).String(),
+					RateSubquery(intervalVar).String(),
 				"{{instance}} - {{ device }} - write"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane Disk IOPS", "short",
@@ -270,13 +270,13 @@ func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 				mg.Raw("node_disk_reads_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace("control-plane")).
-					Rate(intervalVar).String(),
+					RateSubquery(intervalVar).String(),
 				"{{instance}} - {{ device }} - read"),
 			promQuery(
 				mg.Raw("node_disk_writes_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace("control-plane")).
-					Rate(intervalVar).String(),
+					RateSubquery(intervalVar).String(),
 				"{{instance}} - {{ device }} - write"),
 		))
 }
