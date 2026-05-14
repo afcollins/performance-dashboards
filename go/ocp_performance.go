@@ -62,7 +62,7 @@ func buildOCPPerformanceDashboard() *dashboard.DashboardBuilder {
 		).
 		WithVariable(dashboard.NewQueryVariableBuilder("namespace").
 			Label("Namespace").
-			Query(dashboard.StringOrMap{String: cog.ToPtr(q(mg.MetricKubePodInfo, `namespace!="(cluster-density.*|node-density-.*)"`) + ",namespace)")}).
+			Query(dashboard.StringOrMap{String: cog.ToPtr(`label_values(` + q(mg.MetricKubePodInfo, mg.Filters(mg.NSNotRegex("cluster-density.*|node-density-.*"))) + ",namespace)")}).
 			Datasource(promDatasourceRef()).
 			Refresh(dashboard.VariableRefreshOnTimeRangeChanged).
 			Regex("").
