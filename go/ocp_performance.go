@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/grafana/grafana-foundation-sdk/go/cog"
+	"github.com/grafana/grafana-foundation-sdk/go/common"
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
 	"github.com/grafana/grafana-foundation-sdk/go/prometheus"
 	mg "github.com/kube-burner/metrics-generator/pkg/metrics"
@@ -128,8 +129,8 @@ func ocpSnrNhcRow() cog.Builder[dashboard.RowPanel] {
 		GridPos(dashboard.GridPos{X: 0, Y: 0, W: 24, H: 1}).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU stats", "percent",
 			dashboard.GridPos{X: 0, Y: 2, W: 12, H: 8},
-			wrkldAvailCPU(mg.AggAvg),
-			wrkldAvailCPU(mg.AggMax),
+			containerCPUForNamespace(mg.AggAvg, "openshift-workload-availability"),
+			containerCPUForNamespace(mg.AggMax, "openshift-workload-availability"),
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem stats", "bytes",
 			dashboard.GridPos{X: 12, Y: 1, W: 12, H: 8},
@@ -137,31 +138,44 @@ func ocpSnrNhcRow() cog.Builder[dashboard.RowPanel] {
 			wrkldAvailMem(mg.AggMax),
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU sum", "percent",
-			dashboard.GridPos{X: 0, Y: 2, W: 12, H: 8},
-			wrkldAvailCPU(mg.AggSum),
+			dashboard.GridPos{X: 0, Y: 9, W: 12, H: 8},
+			containerCPUForNamespace(mg.AggSum, "openshift-workload-availability"),
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem sum", "bytes",
-			dashboard.GridPos{X: 12, Y: 1, W: 12, H: 8},
+			dashboard.GridPos{X: 12, Y: 9, W: 12, H: 8},
 			wrkldAvailMem(mg.AggAvg),
-		))
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-insights CPU sum", "percent",
+			dashboard.GridPos{X: 0, Y: 17, W: 12, H: 8},
+			containerCPUForNamespace(mg.AggSum, "openshift-insights"),
+		)).
+		WithPanel(genericLegendTimeSeries("taints and unschedulable", "short",
+			dashboard.GridPos{X: 12, Y: 17, W: 12, H: 8},
+			promQuery(mg.Q("kube_node_spec_taint", `key=~'medik8s.io/remediation|node.kubernetes.io/unreachable|node.kubernetes.io/unschedulable'`).Agg(mg.AggCount, mg.GroupByKey).String(), "taint - {{key}}"),
+			promQuery(mg.Q("kube_node_spec_taint", `key=~'medik8s.io/remediation|node.kubernetes.io/unreachable|node.kubernetes.io/unschedulable'`).String(), "taint - {{key}} {{node}}"),
+			promQuery(mg.Q("kube_node_spec_unschedulable", "").Gt("0").Agg(mg.AggCount).String(), "unschedulable"),
+			promQuery(mg.Q("kube_node_spec_unschedulable", "").Gt("0").String(), "unschedulable - {{node}}"),
+			promQuery(mg.Q("kube_node_status_condition", `condition="Ready",status=~"false|unknown"`).Gt("0").String(), "status false or unknown {{node}}"),
+			promQuery(mg.Q(mg.MetricKubePodStatusPhase, mg.Filters(`phase="Pending"`, mg.NSNotRegex("preload.*"))).Gt("0").Agg(mg.AggCount, mg.GroupByNamespace).String(), "pods pending {{namespace}}"),
+		).Stacking(common.NewStackingConfigBuilder().Mode(common.StackingModeNormal)))
 }
 
-func wrkldAvailCPU(newConst mg.AggFunc) *prometheus.DataqueryBuilder {
+func containerCPUForNamespace(agg mg.AggFunc, namespace string) *prometheus.DataqueryBuilder {
 	wrkldAvailCPU := promQuery(
-		mg.Q(mg.MetricContainerCPU, `namespace="openshift-workload-availability",container!="POD",name!=""`).
+		mg.Q(mg.MetricContainerCPU, mg.Filters(mg.NSIn(namespace), `container!="POD",name!=""`)).
 			Rate(intervalVar).Multiply("100").
-			Agg(newConst, mg.GroupByContainer).
+			Agg(agg, mg.GroupByContainer).
 			String(),
-		"{{container}} - "+string(newConst))
+		"{{container}} - "+string(agg))
 	return wrkldAvailCPU
 }
 
-func wrkldAvailMem(newConst mg.AggFunc) *prometheus.DataqueryBuilder {
+func wrkldAvailMem(agg mg.AggFunc) *prometheus.DataqueryBuilder {
 	wrkldAvailMem := promQuery(
-		mg.Q(mg.MetricContainerMemoryRSS, `namespace="openshift-workload-availability",container!="POD",name!=""`).
-			Agg(newConst, mg.GroupByContainer).
+		mg.Q(mg.MetricContainerMemoryRSS, mg.Filters(mg.NSIn("openshift-workload-availability"), `container!="POD",name!=""`)).
+			Agg(agg, mg.GroupByContainer).
 			String(),
-		"{{container}} - "+string(newConst))
+		"{{container}} - "+string(agg))
 	return wrkldAvailMem
 }
 
