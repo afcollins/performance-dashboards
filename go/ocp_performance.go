@@ -143,7 +143,7 @@ func ocpSnrNhcRow() cog.Builder[dashboard.RowPanel] {
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem sum", "bytes",
 			dashboard.GridPos{X: 12, Y: 9, W: 12, H: 8},
-			wrkldAvailMem(mg.AggAvg),
+			wrkldAvailMem(mg.AggSum),
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-insights CPU sum", "percent",
 			dashboard.GridPos{X: 0, Y: 17, W: 12, H: 8},
