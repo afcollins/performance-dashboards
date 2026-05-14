@@ -9,11 +9,11 @@ import (
 const (
 	intervalVar = mg.RateInterval("$interval")
 
-	cgroupIDFilter = `job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
+	cgroupIDFilter             = `job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 	cgroupIDFilterWithJournald = `job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/system.slice/.*.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 
-	fsWriteFilter = `device!~".+dm.+"`
-	fsReadFilter  = `device!~".+dm.+"`
+	fsWriteFilter    = `device!~".+dm.+"`
+	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 )
 
@@ -120,7 +120,6 @@ func buildOCPPerformanceDashboard() *dashboard.DashboardBuilder {
 		WithRow(ocpStackroxRow())
 }
 
-
 // Row: Cluster-at-a-Glance
 func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 	return dashboard.NewRowBuilder("Cluster-at-a-Glance").
@@ -132,7 +131,7 @@ func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 				mg.Q(mg.MetricNodeCPU, `mode != "idle"`).
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					Rate(intervalVar).
+					RateSubquery(intervalVar).
 					Agg(mg.AggSum, mg.GroupByInstance).
 					Multiply("100").String(),
 				"{{instance}}"),
@@ -143,7 +142,7 @@ func ocpClusterAtAGlanceRow() *dashboard.RowBuilder {
 				mg.Q(mg.MetricNodeCPU, `mode != "idle"`).
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
 						mg.NodeRoleLabelReplace("control-plane")).
-					Rate(intervalVar).
+					RateSubquery(intervalVar).
 					Agg(mg.AggSum, mg.GroupByInstance).
 					Multiply("100").String(),
 				"{{instance}}"),
