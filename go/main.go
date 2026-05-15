@@ -10,22 +10,24 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
+	mg "github.com/kube-burner/metrics-generator/pkg/metrics"
 )
 
 type dashboardDef struct {
-	name     string
-	category string
-	builder  func() *dashboard.DashboardBuilder
+	name           string
+	category       string
+	builder        func() *dashboard.DashboardBuilder
+	metricsProfile func() *mg.Generator
 }
 
 var dashboards = []dashboardDef{
-	{"vegeta-wrapper", "General", buildVegetaDashboard},
-	{"uperf-perf", "General", buildUperfDashboard},
-	{"ocp-performance", "General", buildOCPPerformanceDashboard},
-	{"etcd-on-cluster-dashboard", "General", buildEtcdDashboard},
-	{"ovn-dashboard", "General", buildOVNDashboard},
-	{"api-performance-overview", "General", buildAPIPerformanceDashboard},
-	{"node", "General", buildNodeDashboard},
+	{"vegeta-wrapper", "General", buildVegetaDashboard, nil},
+	{"uperf-perf", "General", buildUperfDashboard, nil},
+	{"ocp-performance", "General", buildOCPPerformanceDashboard, buildOCPMetricsProfile},
+	{"etcd-on-cluster-dashboard", "General", buildEtcdDashboard, nil},
+	{"ovn-dashboard", "General", buildOVNDashboard, nil},
+	{"api-performance-overview", "General", buildAPIPerformanceDashboard, nil},
+	{"node", "General", buildNodeDashboard, nil},
 }
 
 func envDefault(key, fallback string) string {
@@ -108,7 +110,20 @@ func renderDashboards(outputDir string) {
 			fmt.Fprintf(os.Stderr, "error writing %s: %v\n", outPath, err)
 			os.Exit(1)
 		}
-
 		fmt.Printf("wrote %s\n", outPath)
+
+		if d.metricsProfile != nil {
+			yamlBytes, err := d.metricsProfile().Generate()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error generating metrics profile for %s/%s: %v\n", d.category, d.name, err)
+				os.Exit(1)
+			}
+			metricsPath := filepath.Join(dir, d.name+"-metrics.yaml")
+			if err := os.WriteFile(metricsPath, yamlBytes, 0o644); err != nil {
+				fmt.Fprintf(os.Stderr, "error writing %s: %v\n", metricsPath, err)
+				os.Exit(1)
+			}
+			fmt.Printf("wrote %s\n", metricsPath)
+		}
 	}
 }
