@@ -13,9 +13,9 @@ import (
 )
 
 type dashboardDef struct {
-	name           string
-	category       string
-	builder        func() *dashboard.DashboardBuilder
+	name            string
+	category        string
+	builder         func() *dashboard.DashboardBuilder
 	metricsProfiles func() []namedProfile
 }
 

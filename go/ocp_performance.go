@@ -187,25 +187,24 @@ func ocpSnrNhcRow(t panelTracker) cog.Builder[dashboard.RowPanel] {
 		Collapsed(true).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU stats", "percent",
 			12, 8,
-			containerCPUForNamespace(t, mg.AggAvg, "openshift-workload-availability"),
-			containerCPUForNamespace(t, mg.AggMax, "openshift-workload-availability"),
+			snrNhcCpuStatsQueries(t, mg.AggAvg, mg.AggMax)...,
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem stats", "bytes",
 			12, 8,
-			wrkldAvailMem(t, mg.AggAvg),
-			wrkldAvailMem(t, mg.AggMax),
+			snrNhcMemoryStatsQueries(t, mg.AggAvg, mg.AggMax)...,
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU sum", "percent",
 			12, 8,
-			containerCPUForNamespace(t, mg.AggSum, "openshift-workload-availability"),
+			snrNhcCpuStatsQueries(t, mg.AggSum)...,
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem sum", "bytes",
 			12, 8,
-			wrkldAvailMem(t, mg.AggSum),
+			snrNhcMemoryStatsQueries(t, mg.AggSum)...,
 		)).
 		WithPanel(genericLegendTimeSeries("openshift-insights CPU sum", "percent",
 			12, 8,
-			containerCPUForNamespace(t, mg.AggSum, "openshift-insights"),
+			containerCPUForNamespaceNoPrefix(t, mg.AggSum, "openshift-insights"),
+			recordedContainerCPUForNamespaceNoPrefix(mg.AggSum, "openshift-insights"),
 		)).
 		WithPanel(genericLegendTimeSeries("taints and unschedulable", "short",
 			12, 8,
@@ -218,7 +217,42 @@ func ocpSnrNhcRow(t panelTracker) cog.Builder[dashboard.RowPanel] {
 		).Stacking(common.NewStackingConfigBuilder().Mode(common.StackingModeNormal)))
 }
 
-func containerCPUForNamespace(t panelTracker, agg mg.AggFunc, namespace string) *prometheus.DataqueryBuilder {
+func snrNhcCpuStatsQueries(t panelTracker, aggs ...mg.AggFunc) []*prometheus.DataqueryBuilder {
+	var queries []*prometheus.DataqueryBuilder
+	for _, pods := range []string{"self-node-remediation-ds", "node-healthcheck-controller-manager", "self-node-remediation-controller-manager"} {
+		for _, agg := range aggs {
+			queries = append(queries,
+				containerCPUForNamespacePodPrefix(t, agg, "openshift-workload-availability", pods),
+				recordedContainerCPUForNamespace(agg, "openshift-workload-availability", pods),
+			)
+		}
+	}
+	return queries
+}
+
+func snrNhcMemoryStatsQueries(t panelTracker, aggs ...mg.AggFunc) []*prometheus.DataqueryBuilder {
+	var queries []*prometheus.DataqueryBuilder
+	for _, pods := range []string{"self-node-remediation-ds", "node-healthcheck-controller-manager", "self-node-remediation-controller-manager"} {
+		for _, agg := range aggs {
+			queries = append(queries,
+				wrkldAvailMem(t, agg, pods),
+				recordedWrkldAvailMem(agg, pods),
+			)
+		}
+	}
+	return queries
+}
+
+func containerCPUForNamespacePodPrefix(t panelTracker, agg mg.AggFunc, namespace string, podPrefix string) *prometheus.DataqueryBuilder {
+	return t.track(
+		"containerCPU"+string(agg)+"_"+namespace+"_"+podPrefix,
+		mg.Q(mg.MetricContainerCPU, mg.Filters(mg.NSIn(namespace), `container!="POD",name!="",pod=~"`+podPrefix+`.*"`)).
+			Rate(intervalVar).Multiply("100").
+			Agg(agg, mg.GroupByContainer),
+		"{{container}} - "+string(agg)+" - "+podPrefix)
+}
+
+func containerCPUForNamespaceNoPrefix(t panelTracker, agg mg.AggFunc, namespace string) *prometheus.DataqueryBuilder {
 	return t.track(
 		"containerCPU"+string(agg)+"_"+namespace,
 		mg.Q(mg.MetricContainerCPU, mg.Filters(mg.NSIn(namespace), `container!="POD",name!=""`)).
@@ -227,12 +261,36 @@ func containerCPUForNamespace(t panelTracker, agg mg.AggFunc, namespace string) 
 		"{{container}} - "+string(agg))
 }
 
-func wrkldAvailMem(t panelTracker, agg mg.AggFunc) *prometheus.DataqueryBuilder {
-	return t.track(
-		"containerMemoryRSS"+string(agg)+"_openshift-workload-availability",
-		mg.Q(mg.MetricContainerMemoryRSS, mg.Filters(mg.NSIn("openshift-workload-availability"), `container!="POD",name!=""`)).
-			Agg(agg, mg.GroupByContainer),
+func recordedContainerCPUForNamespaceNoPrefix(agg mg.AggFunc, namespace string) *prometheus.DataqueryBuilder {
+	return promQuery(
+		mg.Q("container_cpu_usage_seconds_total_container_sum_rate_pod_node_container_namespace_name", mg.Filters(mg.NSIn(namespace))).
+			Agg(agg, mg.GroupByContainer).
+			String(),
 		"{{container}} - "+string(agg))
+}
+
+func recordedContainerCPUForNamespace(agg mg.AggFunc, namespace string, podPrefix string) *prometheus.DataqueryBuilder {
+	return promQuery(
+		mg.Q("container_cpu_usage_seconds_total_container_sum_rate_pod_node_container_namespace_name", mg.Filters(mg.NSIn(namespace), `pod=~"`+podPrefix+`.*"`)).
+			Agg(agg, mg.GroupByContainer).
+			String(),
+		"{{container}} - "+string(agg)+" - "+podPrefix)
+}
+
+func wrkldAvailMem(t panelTracker, agg mg.AggFunc, podPrefix string) *prometheus.DataqueryBuilder {
+	return promQuery(
+		mg.Q(mg.MetricContainerMemoryRSS, mg.Filters(mg.NSIn("openshift-workload-availability"), `container!="POD",name!="",pod=~"`+podPrefix+`.*"`)).
+			Agg(agg, mg.GroupByContainer).
+			String(),
+		"{{container}} - "+string(agg)+" - "+podPrefix)
+}
+
+func recordedWrkldAvailMem(agg mg.AggFunc, podPrefix string) *prometheus.DataqueryBuilder {
+	return promQuery(
+		mg.Q("container_memory_working_set_bytes_container", mg.Filters(mg.NSIn("openshift-workload-availability"), `pod=~"`+podPrefix+`.*"`)).
+			Agg(agg, mg.GroupByContainer).
+			String(),
+		"{{container}} - "+string(agg)+" - "+podPrefix)
 }
 
 // Row: Cluster-at-a-Glance
@@ -724,7 +782,7 @@ func ocpClusterKubeletRow(t panelTracker) *dashboard.RowBuilder {
 					Sub(mg.Q(mg.MetricNodeFsFilesFree, `fstype!="",mountpoint="/run"`)).
 					Agg(mg.AggSum).String(),
 				"sum"),
-			))
+		))
 }
 
 // Row: Cluster Details
