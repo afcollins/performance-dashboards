@@ -14,64 +14,70 @@ local generateTimeSeriesQuery(query, legend) = [
 
 {
   workersCPU: {
+    // Implemet topk and bottomk
     query():
-      generateTimeSeriesQuery('sum( rate( (node_cpu_seconds_total{ mode != "idle" } * on (instance) group_left label_replace( kube_node_role{ role = "worker"} , "instance" , "$1" , "node" ,"(.*)") )[$interval:] ) ) by (instance) * 100', '{{instance}}'),
+      generateTimeSeriesQuery('topk(10, sum( rate( (node_cpu_seconds_total{ mode != "idle" })[$interval:])) by (instance) * 100) * on (instance) group_left label_replace( kube_node_role{ role != "master"} , "instance" , "$1" , "node" ,"(.*)")', '{{instance}}') +
+      generateTimeSeriesQuery('bottomk(10, sum( rate( (node_cpu_seconds_total{ mode != "idle" })[$interval:])) by (instance) * 100) * on (instance) group_left label_replace( kube_node_role{ role != "master"} , "instance" , "$1" , "node" ,"(.*)")', '{{instance}}'),
   },
   controlPlanesCPU: {
     query():
-      generateTimeSeriesQuery('sum( rate( (node_cpu_seconds_total{ mode != "idle" } * on (instance) group_left label_replace( kube_node_role{ role = "control-plane"} , "instance" , "$1" , "node" ,"(.*)") )[$interval:] ) ) by (instance) * 100', '{{instance}}'),
+      generateTimeSeriesQuery('sum( rate( (node_cpu_seconds_total{ mode != "idle" } * on (instance) group_left label_replace( kube_node_role{ role = "master"} , "instance" , "$1" , "node" ,"(.*)") )[$interval:] ) ) by (instance) * 100', '{{instance}}'),
   },
   workersLoad1: {
     query():
-      generateTimeSeriesQuery('node_load1 * on (instance) group_left label_replace( kube_node_role{ role = "worker"} , "instance" , "$1" , "node" ,"(.*)") ', '{{instance}}'),
+      generateTimeSeriesQuery('topk(20, node_load1 * on (instance) group_left label_replace( kube_node_role{ role != "master"} , "instance" , "$1" , "node" ,"(.*)"))', '{{instance}}'),
   },
   controlPlanesLoad1: {
     query():
-      generateTimeSeriesQuery('node_load1 * on (instance) group_left label_replace( kube_node_role{ role = "control-plane"} , "instance" , "$1" , "node" ,"(.*)") ', '{{instance}}'),
+      generateTimeSeriesQuery('node_load1 * on (instance) group_left label_replace( kube_node_role{ role = "master"} , "instance" , "$1" , "node" ,"(.*)") ', '{{instance}}'),
   },
+  // Implement kubepods.slice on the right axis
   workersCGroupCpuRate: {
     query():
-      generateTimeSeriesQuery('sum by (id) (( rate(container_cpu_usage_seconds_total{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"}[$interval])) * 100 * on (node) group_left kube_node_role{ role = "worker" } )', '{{node}}'),
+      generateTimeSeriesQuery('sum by (id) (( rate(container_cpu_usage_seconds_total{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"}[$interval])) * 100 * on (node) group_left kube_node_role{ role != "master" } )', '{{node}}'),
   },
   controlPlaneCGroupCpuRate: {
     query():
-      generateTimeSeriesQuery('sum by (id) (( rate(container_cpu_usage_seconds_total{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"}[$interval])) * 100 * on (node) group_left kube_node_role{ role = "control-plane" } )', '{{node}}'),
+      generateTimeSeriesQuery('sum by (id) (( rate(container_cpu_usage_seconds_total{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"}[$interval])) * 100 * on (node) group_left kube_node_role{ role = "master" } )', '{{node}}'),
   },
   workersCGroupMemoryRSS: {
     query():
-      generateTimeSeriesQuery('sum by (id) ( container_memory_rss{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"} * on (node) group_left kube_node_role{ role = "worker" } )', '{{id}}'),
+      generateTimeSeriesQuery('sum by (id) ( container_memory_rss{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"} * on (node) group_left kube_node_role{ role != "master" } )', '{{id}}'),
   },
   controlPlaneCGroupMemoryRSS: {
     query():
-      generateTimeSeriesQuery('sum by (id) ( container_memory_rss{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"} * on (node) group_left kube_node_role{ role = "control-plane" } )', '{{id}}'),
+      generateTimeSeriesQuery('sum by (id) ( container_memory_rss{ job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"} * on (node) group_left kube_node_role{ role = "master" } )', '{{id}}'),
   },
   workersMemoryAvailable: {
     query():
-      generateTimeSeriesQuery('node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "worker"} , "instance" , "$1" , "node" ,"(.*)")', '{{instance}}') +
-      generateTimeSeriesQuery('sum( node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "worker"} , "instance" , "$1" , "node" ,"(.*)") )', 'sum'),
+      generateTimeSeriesQuery('bottomk(10, node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role != "master"} , "instance" , "$1" , "node" ,"(.*)"))', '{{instance}}') +
+      generateTimeSeriesQuery('sum( node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role != "master"} , "instance" , "$1" , "node" ,"(.*)") )', 'sum'),
   },
   controlPlaneMemoryAvailable: {
     query():
-      generateTimeSeriesQuery('node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "control-plane"} , "instance" , "$1" , "node" ,"(.*)")', '{{instance}}') +
-      generateTimeSeriesQuery('sum( node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "control-plane"} , "instance" , "$1" , "node" ,"(.*)") )', 'sum'),
+      generateTimeSeriesQuery('node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "master"} , "instance" , "$1" , "node" ,"(.*)")', '{{instance}}') +
+      generateTimeSeriesQuery('sum( node_memory_MemAvailable_bytes * on (instance) group_left label_replace( kube_node_role{ role = "master"} , "instance" , "$1" , "node" ,"(.*)") )', 'sum'),
   },
   workersContainerThreads: {
     query():
-      generateTimeSeriesQuery('sum by (node) (container_threads{ container!=""})  * on (node) group_left kube_node_role{ role = "worker" }', '{{node}}'),
+      generateTimeSeriesQuery('topk(10, sum by (node) (container_threads{ container!=""})  * on (node) group_left kube_node_role{ role != "master" })', '{{node}}') +
+      generateTimeSeriesQuery('bottomk(10, sum by (node) (container_threads{ container!=""})  * on (node) group_left kube_node_role{ role != "master" })', '{{node}}'),
   },
   controlPlaneContainerThreads: {
     query():
-      generateTimeSeriesQuery('sum by (node) (container_threads{ container!=""})  * on (node) group_left kube_node_role{ role = "control-plane" }', '{{node}}'),
+      generateTimeSeriesQuery('sum by (node) (container_threads{ container!=""})  * on (node) group_left kube_node_role{ role = "master" }', '{{node}}'),
   },
   workersIOPS: {
     query():
-      generateTimeSeriesQuery('rate( (  node_disk_reads_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "worker" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - read') +
-      generateTimeSeriesQuery('rate( (  node_disk_writes_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "worker" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - write'),
+      generateTimeSeriesQuery('topk(10, rate( (  node_disk_reads_completed_total *  on (instance) group_left label_replace( kube_node_role{ role != "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:]) )', '{{instance}} - {{ device }} - read') +
+      generateTimeSeriesQuery('topk(10, rate( (  node_disk_writes_completed_total *  on (instance) group_left label_replace( kube_node_role{ role != "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:]) )', '{{instance}} - {{ device }} - write') +
+      generateTimeSeriesQuery('bottomk(10, rate( (  node_disk_reads_completed_total *  on (instance) group_left label_replace( kube_node_role{ role != "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:]) )', '{{instance}} - {{ device }} - read') +
+      generateTimeSeriesQuery('bottomk(10, rate( (  node_disk_writes_completed_total *  on (instance) group_left label_replace( kube_node_role{ role != "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:]) )', '{{instance}} - {{ device }} - write'),
   },
   controlPlaneIOPS: {
     query():
-      generateTimeSeriesQuery('rate( (  node_disk_reads_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "control-plane" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - read') +
-      generateTimeSeriesQuery('rate( (  node_disk_writes_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "control-plane" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - write'),
+      generateTimeSeriesQuery('rate( (  node_disk_reads_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - read') +
+      generateTimeSeriesQuery('rate( (  node_disk_writes_completed_total *  on (instance) group_left label_replace( kube_node_role{ role = "master" } , "instance" , "$1" , "node" ,"(.*)") )[$interval:])', '{{instance}} - {{ device }} - write'),
   },
 
   nodeMemory: {
@@ -243,19 +249,19 @@ local generateTimeSeriesQuery(query, legend) = [
   },
   kubeletCPU: {
     query():
-      generateTimeSeriesQuery('topk(10,irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[$interval])*100 *  on (node) group_left kube_node_role{ role = "worker" })', 'kubelet - {{node}}'),
+      generateTimeSeriesQuery('topk(10,irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[$interval])*100 *  on (node) group_left kube_node_role{ role != "master" })', 'kubelet - {{node}}'),
   },
   crioCPU: {
     query():
-      generateTimeSeriesQuery('topk(10,irate(process_cpu_seconds_total{service="kubelet",job="crio"}[$interval])*100 *  on (node) group_left kube_node_role{ role = "worker" })', 'crio - {{node}}'),
+      generateTimeSeriesQuery('topk(10,irate(process_cpu_seconds_total{service="kubelet",job="crio"}[$interval])*100 *  on (node) group_left kube_node_role{ role != "master" })', 'crio - {{node}}'),
   },
   kubeletMemory: {
     query():
-      generateTimeSeriesQuery('topk(10,process_resident_memory_bytes{service="kubelet",job="kubelet"} *  on (node) group_left kube_node_role{ role = "worker" })', 'kubelet - {{node}}'),
+      generateTimeSeriesQuery('topk(10,process_resident_memory_bytes{service="kubelet",job="kubelet"} *  on (node) group_left kube_node_role{ role != "master" })', 'kubelet - {{node}}'),
   },
   crioMemory: {
     query():
-      generateTimeSeriesQuery('topk(10,process_resident_memory_bytes{service="kubelet",job="crio"} *  on (node) group_left kube_node_role{ role = "worker" })', 'crio - {{node}}'),
+      generateTimeSeriesQuery('topk(10,process_resident_memory_bytes{service="kubelet",job="crio"} *  on (node) group_left kube_node_role{ role != "master" })', 'crio - {{node}}'),
   },
   crioINodes: {
     query():
@@ -269,7 +275,8 @@ local generateTimeSeriesQuery(query, legend) = [
   currentNodeCount: {
     query():
       generateTimeSeriesQuery('sum(kube_node_info{})', 'Number of nodes')
-      + generateTimeSeriesQuery('sum(kube_node_status_condition{status="true"}) by (condition) > 0', 'Node: {{ condition }}'),
+      + generateTimeSeriesQuery('sum(kube_node_status_condition{status="true"}) by (condition) > 0', 'Node: {{ condition }}')
+      + generateTimeSeriesQuery('kube_node_status_condition{status="true",condition="Ready"} == 0', 'Not Ready Node: {{ node }}'),
   },
   currentNamespaceCount: {
     query():
@@ -285,7 +292,7 @@ local generateTimeSeriesQuery(query, legend) = [
   },
   podCount: {
     query():
-      generateTimeSeriesQuery('sum(kube_pod_status_phase{}) by (phase)', '{{phase}} pods'),
+      generateTimeSeriesQuery('sum(kube_pod_status_phase{phase="Pending"}) by (phase)', '{{phase}} pods'),
   },
   secretCmCount: {
     query():

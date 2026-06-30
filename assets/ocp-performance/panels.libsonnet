@@ -9,6 +9,7 @@ local g = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonn
     local standardOptions = timeSeries.standardOptions,
     local byRegexp = timeSeries.standardOptions.override.byRegexp,
 
+    // impelement "Connect null values: Never"
     generic(title, unit, targets, gridPos):
       timeSeries.new(title)
       + timeSeries.queryOptions.withTargets(targets)
@@ -18,7 +19,7 @@ local g = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonn
       + timeSeries.gridPos.withY(gridPos.y)
       + timeSeries.gridPos.withH(gridPos.h)
       + timeSeries.gridPos.withW(gridPos.w)
-      + custom.withSpanNulls(false)
+      + custom.withSpanNulls('false')
       + options.tooltip.withMode('multi')
       + options.tooltip.withSort('desc')
       + options.legend.withDisplayMode('table'),
