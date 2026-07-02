@@ -29,6 +29,7 @@ var dashboards = []dashboardDef{
 	{"ovn-dashboard", "General", buildOVNDashboard, nil},
 	{"api-performance-overview", "General", buildAPIPerformanceDashboard, nil},
 	{"node", "General", buildNodeDashboard, nil},
+	{"etcd-density-hcp", "General", buildEtcdWorkloadsDashboard, buildEtcdWorkloadsProfiles},
 }
 
 func envDefault(key, fallback string) string {
