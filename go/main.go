@@ -47,6 +47,7 @@ var dashboards = []dashboardDef{
 	{"node", "General", buildNodeDashboard, nil},
 	{"node-comparison", "General", buildNodeComparisonDashboard, buildNodeComparisonProfiles},
 	{"node-cpu-comparison", "General", buildNodeCPUComparisonDashboard, buildNodeCPUComparisonProfiles},
+	{"etcd-density-hcp", "General", buildEtcdWorkloadsDashboard, buildEtcdWorkloadsProfiles},
 }
 
 func envDefault(key, fallback string) string {
