@@ -3,7 +3,9 @@ package main
 import (
 	mg "github.com/afcollins/metrics-generator/pkg/metrics"
 	"github.com/grafana/grafana-foundation-sdk/go/cog"
+	"github.com/grafana/grafana-foundation-sdk/go/common"
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
+	"github.com/grafana/grafana-foundation-sdk/go/prometheus"
 )
 
 const (
@@ -157,6 +159,7 @@ func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 				intervalOption("5m"),
 			}),
 		).
+		WithRow(ocpSnrNhcRow(t)).
 		// Row: Cluster-at-a-Glance
 		WithRow(ocpClusterAtAGlanceRow(t)).
 		// Row: OVN
@@ -179,6 +182,58 @@ func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 		WithRow(ocpStackroxRow(t))
 }
 
+func ocpSnrNhcRow(t panelTracker) cog.Builder[dashboard.RowPanel] {
+	return dashboard.NewRowBuilder("SNR / NHC Panels").
+		Collapsed(true).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU stats", "percent",
+			12, 8,
+			containerCPUForNamespace(t, mg.AggAvg, "openshift-workload-availability"),
+			containerCPUForNamespace(t, mg.AggMax, "openshift-workload-availability"),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem stats", "bytes",
+			12, 8,
+			wrkldAvailMem(t, mg.AggAvg),
+			wrkldAvailMem(t, mg.AggMax),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability CPU sum", "percent",
+			12, 8,
+			containerCPUForNamespace(t, mg.AggSum, "openshift-workload-availability"),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-workload-availability Mem sum", "bytes",
+			12, 8,
+			wrkldAvailMem(t, mg.AggSum),
+		)).
+		WithPanel(genericLegendTimeSeries("openshift-insights CPU sum", "percent",
+			12, 8,
+			containerCPUForNamespace(t, mg.AggSum, "openshift-insights"),
+		)).
+		WithPanel(genericLegendTimeSeries("taints and unschedulable", "short",
+			12, 8,
+			t.track("kubeNodeSpecTaintCount", mg.Q("kube_node_spec_taint", `key=~'medik8s.io/remediation|node.kubernetes.io/unreachable|node.kubernetes.io/unschedulable'`).Agg(mg.AggCount, mg.GroupByKey), "taint - {{key}}"),
+			promQuery(mg.Q("kube_node_spec_taint", `key=~'medik8s.io/remediation|node.kubernetes.io/unreachable|node.kubernetes.io/unschedulable'`).String(), "taint - {{key}} {{node}}"),
+			t.track("kubeNodeSpecUnschedulableCount", mg.Q("kube_node_spec_unschedulable", "").Gt("0").Agg(mg.AggCount), "unschedulable"),
+			promQuery(mg.Q("kube_node_spec_unschedulable", "").Gt("0").String(), "unschedulable - {{node}}"),
+			t.track("kubeNodeStatusNotReady", mg.Q("kube_node_status_condition", `condition="Ready",status=~"false|unknown"`).Gt("0"), "status false or unknown {{node}}"),
+			t.track("kubePodPending", mg.Q(mg.MetricKubePodStatusPhase, mg.Filters(`phase="Pending"`, mg.NSNotRegex("preload.*"))).Gt("0").Agg(mg.AggCount, mg.GroupByNamespace), "pods pending {{namespace}}"),
+		).Stacking(common.NewStackingConfigBuilder().Mode(common.StackingModeNormal)))
+}
+
+func containerCPUForNamespace(t panelTracker, agg mg.AggFunc, namespace string) *prometheus.DataqueryBuilder {
+	return t.track(
+		"containerCPU"+string(agg)+"_"+namespace,
+		mg.Q(mg.MetricContainerCPU, mg.Filters(mg.NSIn(namespace), `container!="POD",name!=""`)).
+			Rate(intervalVar).Multiply("100").
+			Agg(agg, mg.GroupByContainer),
+		"{{container}} - "+string(agg))
+}
+
+func wrkldAvailMem(t panelTracker, agg mg.AggFunc) *prometheus.DataqueryBuilder {
+	return t.track(
+		"containerMemoryRSS"+string(agg)+"_openshift-workload-availability",
+		mg.Q(mg.MetricContainerMemoryRSS, mg.Filters(mg.NSIn("openshift-workload-availability"), `container!="POD",name!=""`)).
+			Agg(agg, mg.GroupByContainer),
+		"{{container}} - "+string(agg))
+}
 
 // Row: Cluster-at-a-Glance
 func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
