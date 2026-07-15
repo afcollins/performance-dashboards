@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	mg "github.com/afcollins/metrics-generator/pkg/metrics"
 	"github.com/grafana/grafana-foundation-sdk/go/cog"
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
@@ -15,6 +17,8 @@ const (
 	fsWriteFilter    = `device!~".+dm.+"`
 	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
+
+	workersNodeFilter = `instance!~"ip-10-0-114-248.us-west-2.compute.internal|ip-10-0-13-26.us-west-2.compute.internal|ip-10-0-23-147.us-west-2.compute.internal|ip-10-0-26-19.us-west-2.compute.internal|ip-10-0-47-16.us-west-2.compute.internal|ip-10-0-56-186.us-west-2.compute.internal|ip-10-0-66-224.us-west-2.compute.internal|ip-10-0-75-127.us-west-2.compute.internal"`
 )
 
 func q(metric mg.Metric, filters string) string {
@@ -166,14 +170,34 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		Collapsed(true).
 		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percent",
 			12, 8,
-			t.track("nodeCPUWorker",
-				mg.Q(mg.MetricNodeCPU, `mode != "idle"`).
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)).
+			t.track("nodeCPUWorker_p90",
+				mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workersNodeFilter).
 					RateSubquery(intervalVar).
 					Agg(mg.AggSum, mg.GroupByInstance).
-					Multiply("100"),
-				"{{instance}}"),
+					Multiply("100").
+					Quantile(mg.P90),
+				fmt.Sprintf("%s", mg.P90.Label)),
+			t.track("nodeCPUWorker_p50",
+				mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workersNodeFilter).
+					RateSubquery(intervalVar).
+					Agg(mg.AggSum, mg.GroupByInstance).
+					Multiply("100").
+					Quantile(mg.P50),
+				fmt.Sprintf("%s", mg.P50.Label)),
+			t.track("nodeCPUWorker_min",
+				mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workersNodeFilter).
+					RateSubquery(intervalVar).
+					Agg(mg.AggSum, mg.GroupByInstance).
+					Multiply("100").
+					Agg(mg.AggMin),
+				fmt.Sprintf("%s", mg.AggMin)),
+			t.track("nodeCPUWorker_max",
+				mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workersNodeFilter).
+					RateSubquery(intervalVar).
+					Agg(mg.AggSum, mg.GroupByInstance).
+					Multiply("100").
+					Agg(mg.AggMax),
+				fmt.Sprintf("%s", mg.AggMax)),
 			promQuery("node_cpu_seconds_sum_rate_2m_30s_worker", "{{instance}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane CPU Usage", "percent",
