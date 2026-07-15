@@ -16,7 +16,9 @@ const (
 	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 
-	workersNodeFilter = `instance!~"ip-10-0-114-248.us-west-2.compute.internal|ip-10-0-13-26.us-west-2.compute.internal|ip-10-0-23-147.us-west-2.compute.internal|ip-10-0-26-19.us-west-2.compute.internal|ip-10-0-47-16.us-west-2.compute.internal|ip-10-0-56-186.us-west-2.compute.internal|ip-10-0-66-224.us-west-2.compute.internal|ip-10-0-75-127.us-west-2.compute.internal"`
+	nonWorkerList        = `ip-10-0-114-248.us-west-2.compute.internal|ip-10-0-13-26.us-west-2.compute.internal|ip-10-0-23-147.us-west-2.compute.internal|ip-10-0-26-19.us-west-2.compute.internal|ip-10-0-47-16.us-west-2.compute.internal|ip-10-0-56-186.us-west-2.compute.internal|ip-10-0-66-224.us-west-2.compute.internal|ip-10-0-75-127.us-west-2.compute.internal`
+	workerInstanceFilter = `instance!~"` + nonWorkerList + `"`
+	workerNodesFilter    = `node!~"` + nonWorkerList + `"`
 )
 
 func q(metric mg.Metric, filters string) string {
@@ -169,7 +171,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percent",
 			12, 8,
 			append(summaryStatsQueries(t, "nodeCPUWorker", func() *mg.Query {
-				return mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workersNodeFilter).
+				return mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workerInstanceFilter).
 					RateSubquery(intervalVar).
 					Agg(mg.AggSum, mg.GroupByInstance).
 					Multiply("100")
@@ -207,17 +209,16 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		)).
 		WithPanel(genericLegendCounterSumRightHandTimeSeries("Workers Memory Available", "bytes",
 			12, 8,
-			t.track("nodeMemoryAvailableWorker",
-				mg.Q(mg.MetricNodeMemoryAvailable, "").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)),
-				"{{instance}}"),
-			t.track("nodeMemoryAvailableWorkerSum",
-				mg.Q(mg.MetricNodeMemoryAvailable, "").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					Agg(mg.AggSum),
-				"sum"),
+			append(summaryStatsQueries(t, "nodeMemoryAvailableWorker", func() *mg.Query {
+				return mg.Q(mg.MetricNodeMemoryAvailable, workerInstanceFilter)
+			}),
+				t.track("nodeMemoryAvailableWorkerSum",
+					mg.Q(mg.MetricNodeMemoryAvailable, "").
+						MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
+							mg.NodeRoleLabelReplace(mg.RoleWorker)).
+						Agg(mg.AggSum),
+					"sum"),
+			)...,
 		)).
 		WithPanel(genericLegendCounterSumRightHandTimeSeries("Control Plane Memory Available", "bytes",
 			12, 8,
@@ -279,13 +280,12 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Workers Container Threads", "short",
 			12, 8,
-			t.track("containerThreadsWorker",
-				mg.Raw(`container_threads{container!=""}`).
-					Agg(mg.AggSum, mg.GroupByNode).
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
-						mg.NodeRoleFilter(mg.RoleWorker)),
-				"{{instance}}"),
-			promQuery("container_threads_sum_by_node_worker", "{{node}}"),
+			append(summaryStatsQueries(t, "containerThreadsWorker", func() *mg.Query {
+				return mg.Raw(`container_threads{container!="",`+workerNodesFilter+`}`).
+					Agg(mg.AggSum, mg.GroupByNode)
+			}),
+				promQuery("container_threads_sum_by_node_worker", "{{node}}"),
+			)...,
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Control Plane Container Threads", "short",
 			12, 8,
@@ -299,18 +299,15 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		)).
 		WithPanel(genericLegendTimeSeries("Workers Disk IOPS", "short",
 			12, 8,
-			t.track("nodeDiskReadsWorker",
-				mg.Raw("node_disk_reads_completed_total").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					RateSubquery(intervalVar),
-				"{{instance}} - {{ device }} - read"),
-			t.track("nodeDiskWritesWorker",
-				mg.Raw("node_disk_writes_completed_total").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)).
-					RateSubquery(intervalVar),
-				"{{instance}} - {{ device }} - write"),
+			append(summaryStatsQueries(t, "nodeDiskReadsWorker", func() *mg.Query {
+				return mg.Raw(`node_disk_reads_completed_total{` + workerInstanceFilter + `}`).
+					RateSubquery(intervalVar)
+			}, "read"),
+				summaryStatsQueries(t, "nodeDiskWritesWorker", func() *mg.Query {
+					return mg.Raw(`node_disk_writes_completed_total{` + workerInstanceFilter + `}`).
+						RateSubquery(intervalVar)
+				}, "write")...,
+			)...,
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane Disk IOPS", "short",
 			12, 8,
