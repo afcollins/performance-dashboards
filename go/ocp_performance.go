@@ -16,7 +16,7 @@ const (
 	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 
-	nonWorkerList        = `ip-10-0-114-248.us-west-2.compute.internal|ip-10-0-13-26.us-west-2.compute.internal|ip-10-0-23-147.us-west-2.compute.internal|ip-10-0-26-19.us-west-2.compute.internal|ip-10-0-47-16.us-west-2.compute.internal|ip-10-0-56-186.us-west-2.compute.internal|ip-10-0-66-224.us-west-2.compute.internal|ip-10-0-75-127.us-west-2.compute.internal`
+	nonWorkerList        = `ip-10-0-114-227.us-west-2.compute.internal|ip-10-0-3-212.us-west-2.compute.internal|ip-10-0-33-1.us-west-2.compute.internal|ip-10-0-44-126.us-west-2.compute.internal|ip-10-0-5-89.us-west-2.compute.internal|ip-10-0-8-17.us-west-2.compute.internal|ip-10-0-90-75.us-west-2.compute.internal|ip-10-0-95-116.us-west-2.compute.internal`
 	workerInstanceFilter = `instance!~"` + nonWorkerList + `"`
 	workerNodesFilter    = `node!~"` + nonWorkerList + `"`
 )
