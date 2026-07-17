@@ -24,6 +24,7 @@ var dashboards = []dashboardDef{
 	{"vegeta-wrapper", "General", buildVegetaDashboard, nil},
 	{"uperf-perf", "General", buildUperfDashboard, nil},
 	{"ocp-performance", "General", buildOCPPerformanceDashboard, buildOCPProfiles},
+	{"ocp-performance-cudns", "General", buildOCPPerformanceCUDNsDashboard, buildOCPCUDNsProfiles},
 	{"ocp-performance-collected", "General", buildOCPCollectedDashboard, nil},
 	{"etcd-on-cluster-dashboard", "General", buildEtcdDashboard, buildEtcdProfiles},
 	{"etcd-on-cluster-collected", "General", buildEtcdCollectedDashboard, nil},
