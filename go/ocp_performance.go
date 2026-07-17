@@ -16,9 +16,12 @@ const (
 	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 
-	nonWorkerList        = `ip-10-0-114-227.us-west-2.compute.internal|ip-10-0-3-212.us-west-2.compute.internal|ip-10-0-33-1.us-west-2.compute.internal|ip-10-0-44-126.us-west-2.compute.internal|ip-10-0-5-89.us-west-2.compute.internal|ip-10-0-8-17.us-west-2.compute.internal|ip-10-0-90-75.us-west-2.compute.internal|ip-10-0-95-116.us-west-2.compute.internal`
-	workerInstanceFilter = `instance!~"` + nonWorkerList + `"`
-	workerNodesFilter    = `node!~"` + nonWorkerList + `"`
+	infraList                  = `ip-10-0-33-1.us-west-2.compute.internal|ip-10-0-8-17.us-west-2.compute.internal|ip-10-0-90-75.us-west-2.compute.internal`
+	controlPlaneList           = `ip-10-0-114-227.us-west-2.compute.internal|ip-10-0-3-212.us-west-2.compute.internal|ip-10-0-44-126.us-west-2.compute.internal|ip-10-0-5-89.us-west-2.compute.internal|ip-10-0-95-116.us-west-2.compute.internal`
+	nonWorkerList              = infraList + `|` + controlPlaneList
+	controlPlaneInstanceFilter = `instance!~"` + controlPlaneList + `"`
+	workerInstanceFilter       = `instance!~"` + nonWorkerList + `"`
+	workerNodesFilter          = `node!~"` + nonWorkerList + `"`
 )
 
 func q(metric mg.Metric, filters string) string {
@@ -168,26 +171,20 @@ func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 	return dashboard.NewRowBuilder("Cluster-at-a-Glance").
 		Collapsed(true).
-		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percent",
+		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percentunit",
 			12, 8,
 			append(summaryStatsQueries(t, "nodeCPUWorker", func() *mg.Query {
-				return mg.Q(mg.MetricNodeCPU, `mode != "idle", `+workerInstanceFilter).
-					RateSubquery(intervalVar).
-					Agg(mg.AggSum, mg.GroupByInstance).
-					Multiply("100")
+				return mg.Raw(`instance:node_cpu:rate:sum{` + workerInstanceFilter + `}`)
 			}),
 				promQuery("node_cpu_seconds_sum_rate_2m_30s_worker", "{{instance}}"),
 			)...,
 		)).
-		WithPanel(genericLegendTimeSeries("Control Plane CPU Usage", "percent",
+		WithPanel(genericLegendTimeSeries("Control Plane CPU Usage", "percentunit",
 			12, 8,
-			t.track("nodeCPUControlPlane",
-				mg.Q(mg.MetricNodeCPU, `mode != "idle"`).
+			t.trackRaw("nodeCPUControlPlane",
+				mg.Raw("instance:node_cpu:rate:sum").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")).
-					RateSubquery(intervalVar).
-					Agg(mg.AggSum, mg.GroupByInstance).
-					Multiply("100"),
+						mg.NodeRoleLabelReplace("control-plane")).String(),
 				"{{instance}}"),
 			promQuery("node_cpu_seconds_sum_rate_2m_30s_master", "{{instance}}"),
 		)).
