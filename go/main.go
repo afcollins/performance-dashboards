@@ -25,6 +25,7 @@ var dashboards = []dashboardDef{
 	{"uperf-perf", "General", buildUperfDashboard, nil},
 	{"ocp-performance", "General", buildOCPPerformanceDashboard, buildOCPProfiles},
 	{"ocp-performance-cudns", "General", buildOCPPerformanceCUDNsDashboard, buildOCPCUDNsProfiles},
+	{"ocp-performance-cudns-collected", "General", buildOCPPerformanceCUDNsCollectedDashboard, nil},
 	{"ocp-performance-collected", "General", buildOCPCollectedDashboard, nil},
 	{"etcd-on-cluster-dashboard", "General", buildEtcdDashboard, buildEtcdProfiles},
 	{"etcd-on-cluster-collected", "General", buildEtcdCollectedDashboard, nil},

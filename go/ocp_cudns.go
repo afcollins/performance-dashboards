@@ -10,6 +10,10 @@ func buildOCPPerformanceCUDNsDashboard() *dashboard.DashboardBuilder {
 	return buildOCPCUDNsDashboard(&queryTracker{})
 }
 
+func buildOCPPerformanceCUDNsCollectedDashboard() *dashboard.DashboardBuilder {
+	return buildOCPCUDNsDashboard(&queryTracker{useMetricNames: true})
+}
+
 func buildOCPCUDNsDashboard(t panelTracker) *dashboard.DashboardBuilder {
 	return ocpBase(t, "Openshift Performance - CUDNs").
 		// Row: CUDNs
