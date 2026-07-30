@@ -59,7 +59,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 					Agg(mg.AggSum, mg.GroupByInstance).
 					Multiply("100"),
 				"{{node}}"),
-			promQuery("node_cpu_seconds_sum_rate_2m_30s_worker", "{{node}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane CPU Usage", "percent",
 			12, 8,
@@ -71,7 +70,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 					Agg(mg.AggSum, mg.GroupByInstance).
 					Multiply("100"),
 				"{{node}}"),
-			promQuery("node_cpu_seconds_sum_rate_2m_30s_master", "{{node}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Workers Load1", "short",
 			12, 8,
@@ -127,7 +125,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 						mg.NodeRoleFilter(mg.RoleWorker)).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_cpu_usage_seconds_total_cgroup_sum_rate_id_node * on (node) group_left kube_node_role{ role = "worker" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane CGroup CPU Rate", "percent",
 			12, 8,
@@ -139,7 +136,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 						mg.NodeRoleFilter("control-plane")).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_cpu_usage_seconds_total_cgroup_sum_rate_id_node * on (node) group_left kube_node_role{ role = "control-plane" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Workers CGroup Memory RSS", "bytes",
 			12, 8,
@@ -149,7 +145,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 						mg.NodeRoleFilter(mg.RoleWorker)).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_memory_working_set_bytes_cgroup * on (node) group_left kube_node_role{ role = "worker" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Control Plane CGroup Memory RSS", "bytes",
 			12, 8,
@@ -159,7 +154,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 						mg.NodeRoleFilter("control-plane")).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_memory_working_set_bytes_cgroup * on (node) group_left kube_node_role{ role = "control-plane" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Workers Container Threads", "short",
 			12, 8,
@@ -169,7 +163,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
 						mg.NodeRoleFilter(mg.RoleWorker)),
 				"{{instance}}"),
-			promQuery("container_threads_sum_by_node_worker", "{{node}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Control Plane Container Threads", "short",
 			12, 8,
@@ -179,7 +172,6 @@ func kindClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
 						mg.NodeRoleFilter("control-plane")),
 				"{{instance}}"),
-			promQuery("container_threads_sum_by_node_master", "{{node}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Workers Disk IOPS", "short",
 			12, 8,
