@@ -72,7 +72,7 @@ spec:
     spec:
       containers:
       - name: dittybopper
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         image: ${GRAFANA_IMAGE}
         ports:
         - name: sc-grafana-http

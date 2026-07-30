@@ -8,8 +8,8 @@ TEMPLATESDIR = templates
 ASSETS := $(wildcard assets/**/*.libsonnet)
 OUTPUTDIR = rendered
 ALLDIRS = $(BINDIR) $(OUTPUTDIR)
-SYNCER_IMG_TAG ?= quay.io/cloud-bulldozer/dittybopper-syncer:latest
-PLATFORM = linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
+SYNCER_IMG_TAG ?= quay.io/afcollins/dittybopper-syncer:local-kind
+PLATFORM = linux/amd64
 
 # Get all templates at $(TEMPLATESDIR)
 TEMPLATES := $(wildcard $(TEMPLATESDIR)/**/*.jsonnet)
@@ -62,7 +62,7 @@ deploy: build-go
 	bin/deployer --deploy
 
 build-syncer-image: build
-	podman build --platform=${PLATFORM} -f Dockerfile --manifest=${SYNCER_IMG_TAG} .
+	podman build --network=host --platform=${PLATFORM} -f Dockerfile --tag=${SYNCER_IMG_TAG} .
 
 push-syncer-image:
 	podman manifest push ${SYNCER_IMG_TAG} ${SYNCER_IMG_TAG}
