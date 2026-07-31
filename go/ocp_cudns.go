@@ -17,7 +17,16 @@ func buildOCPPerformanceCUDNsCollectedDashboard() *dashboard.DashboardBuilder {
 func buildOCPCUDNsDashboard(t panelTracker) *dashboard.DashboardBuilder {
 	return ocpBase(t, "Openshift Performance - CUDNs").
 		// Row: CUDNs
-		WithRow(ocpCUDNRow(t))
+		WithRow(ocpCUDNRow(t)).
+		WithRow(dashboard.NewRowBuilder("ovsvswitchd cpu").Collapsed(true).
+			WithPanel(genericLegendTimeSeries("Workers ovsvswitchd CGroup CPU Rate", "percent",
+				12, 8,
+				summaryStatsQueries(t, "cgroupOVSCPUWorker", func() *mg.Query {
+					return mg.Q(mg.MetricContainerCPU, `id=~"/.*/ovs-vswitchd.service",`+workerNodesFilter).
+						Rate(intervalVar).
+						Multiply("100")
+				})...,
+			)))
 }
 
 func buildOCPCUDNsProfiles() []namedProfile {

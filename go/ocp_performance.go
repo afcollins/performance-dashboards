@@ -170,14 +170,6 @@ func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 	return dashboard.NewRowBuilder("Cluster-at-a-Glance").
 		Collapsed(true).
-		WithPanel(genericLegendTimeSeries("Workers ovsvswitchd CGroup CPU Rate", "percent",
-			12, 8,
-			summaryStatsQueries(t, "cgroupOVSCPUWorker", func() *mg.Query {
-				return mg.Q(mg.MetricContainerCPU, `id=~"/.*/ovs-vswitchd.service,`+workerNodesFilter).
-					Rate(intervalVar).
-					Multiply("100")
-			})...,
-		)).
 		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percentunit",
 			12, 8,
 			append(summaryStatsQueries(t, "nodeCPUWorker", func() *mg.Query {
@@ -191,7 +183,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 			t.trackRaw("nodeCPUControlPlane",
 				mg.Raw("instance:node_cpu:rate:sum").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")).String(),
+						mg.NodeRoleLabelReplace("master")).String(),
 				"{{instance}}"),
 			promQuery("node_cpu_seconds_sum_rate_2m_30s_master", "{{instance}}"),
 		)).
@@ -206,7 +198,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 			t.track("nodeLoad1ControlPlane",
 				mg.Raw("node_load1").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")),
+						mg.NodeRoleLabelReplace("master")),
 				"{{instance}}"),
 		)).
 		WithPanel(genericLegendCounterSumRightHandTimeSeries("Workers Memory Available", "bytes",
@@ -227,12 +219,12 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 			t.track("nodeMemoryAvailableControlPlane",
 				mg.Q(mg.MetricNodeMemoryAvailable, "").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")),
+						mg.NodeRoleLabelReplace("master")),
 				"{{instance}}"),
 			t.track("nodeMemoryAvailableControlPlaneSum",
 				mg.Q(mg.MetricNodeMemoryAvailable, "").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")).
+						mg.NodeRoleLabelReplace("master")).
 					Agg(mg.AggSum),
 				"sum"),
 		)).
@@ -253,10 +245,10 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 					Rate(intervalVar).
 					Multiply("100").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
-						mg.NodeRoleFilter("control-plane")).
+						mg.NodeRoleFilter("master")).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_cpu_usage_seconds_total_cgroup_sum_rate_id_node * on (node) group_left kube_node_role{ role = "control-plane" })`, "{{id}}"),
+			promQuery(`sum by (id) (container_cpu_usage_seconds_total_cgroup_sum_rate_id_node * on (node) group_left kube_node_role{ role = "master" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Workers CGroup Memory RSS", "bytes",
 			12, 8,
@@ -273,10 +265,10 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 			t.track("cgroupMemoryRSSControlPlane",
 				mg.Q(mg.MetricContainerMemoryRSS, cgroupIDFilter).
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
-						mg.NodeRoleFilter("control-plane")).
+						mg.NodeRoleFilter("master")).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
-			promQuery(`sum by (id) (container_memory_working_set_bytes_cgroup * on (node) group_left kube_node_role{ role = "control-plane" })`, "{{id}}"),
+			promQuery(`sum by (id) (container_memory_working_set_bytes_cgroup * on (node) group_left kube_node_role{ role = "master" })`, "{{id}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("Workers Container Threads", "short",
 			12, 8,
@@ -293,7 +285,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 				mg.Raw(`container_threads{container!=""}`).
 					Agg(mg.AggSum, mg.GroupByNode).
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
-						mg.NodeRoleFilter("control-plane")),
+						mg.NodeRoleFilter("master")),
 				"{{instance}}"),
 			promQuery("container_threads_sum_by_node_master", "{{node}}"),
 		)).
@@ -314,13 +306,13 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 			t.track("nodeDiskReadsControlPlane",
 				mg.Raw("node_disk_reads_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")).
+						mg.NodeRoleLabelReplace("master")).
 					RateSubquery(intervalVar),
 				"{{instance}} - {{ device }} - read"),
 			t.track("nodeDiskWritesControlPlane",
 				mg.Raw("node_disk_writes_completed_total").
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace("control-plane")).
+						mg.NodeRoleLabelReplace("master")).
 					RateSubquery(intervalVar),
 				"{{instance}} - {{ device }} - write"),
 		))
