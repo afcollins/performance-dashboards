@@ -9,15 +9,14 @@ import (
 const (
 	intervalVar = mg.RateInterval("$interval")
 
-	cgroupIDFilter             = `job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
-	cgroupIDFilterWithJournald = `job=~".*", id =~"/system.slice|/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/system.slice/.*.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
+	cgroupIDFilter = `job=~".*", id =~"/system.slice|/system.slice/.*.service|/.*/ovs-vswitchd.service|/kubepods.slice"`
 
 	fsWriteFilter    = `device!~".+dm.+"`
 	fsReadFilter     = `device!~".+dm.+"`
 	cgroupFSIDFilter = `device!~".+dm.+", id =~"/system.slice/kubelet.service|/.*/ovs-vswitchd.service|/system.slice/crio.service|/system.slice/systemd-journald.service|/.*/ovsdb-server.service|/system.slice/systemd-udevd.service|/kubepods.slice"`
 
-	infraList                  = `ip-10-0-33-1.us-west-2.compute.internal|ip-10-0-8-17.us-west-2.compute.internal|ip-10-0-90-75.us-west-2.compute.internal`
-	controlPlaneList           = `ip-10-0-114-227.us-west-2.compute.internal|ip-10-0-3-212.us-west-2.compute.internal|ip-10-0-44-126.us-west-2.compute.internal|ip-10-0-5-89.us-west-2.compute.internal|ip-10-0-95-116.us-west-2.compute.internal`
+	infraList                  = ``
+	controlPlaneList           = ``
 	nonWorkerList              = infraList + `|` + controlPlaneList
 	controlPlaneInstanceFilter = `instance!~"` + controlPlaneList + `"`
 	workerInstanceFilter       = `instance!~"` + nonWorkerList + `"`
@@ -171,6 +170,14 @@ func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 	return dashboard.NewRowBuilder("Cluster-at-a-Glance").
 		Collapsed(true).
+		WithPanel(genericLegendTimeSeries("Workers ovsvswitchd CGroup CPU Rate", "percent",
+			12, 8,
+			summaryStatsQueries(t, "cgroupOVSCPUWorker", func() *mg.Query {
+				return mg.Q(mg.MetricContainerCPU, `id=~"/.*/ovs-vswitchd.service,`+workerNodesFilter).
+					Rate(intervalVar).
+					Multiply("100")
+			})...,
+		)).
 		WithPanel(genericLegendTimeSeries("Workers CPU Usage", "percentunit",
 			12, 8,
 			append(summaryStatsQueries(t, "nodeCPUWorker", func() *mg.Query {
@@ -191,9 +198,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		WithPanel(genericLegendTimeSeries("Workers Load1", "short",
 			12, 8,
 			t.track("nodeLoad1Worker",
-				mg.Raw("node_load1").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByInstance},
-						mg.NodeRoleLabelReplace(mg.RoleWorker)),
+				mg.Raw(`node_load1{`+workerInstanceFilter+`}`),
 				"{{instance}}"),
 		)).
 		WithPanel(genericLegendTimeSeries("Control Plane Load1", "short",
@@ -234,11 +239,9 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		WithPanel(genericLegendTimeSeries("Workers CGroup CPU Rate", "percent",
 			12, 8,
 			t.track("cgroupCPUWorker",
-				mg.Q(mg.MetricContainerCPU, cgroupIDFilter).
+				mg.Q(mg.MetricContainerCPU, cgroupIDFilter+`,`+workerNodesFilter).
 					Rate(intervalVar).
 					Multiply("100").
-					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
-						mg.NodeRoleFilter(mg.RoleWorker)).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{instance}}"),
 			promQuery(`sum by (id) (container_cpu_usage_seconds_total_cgroup_sum_rate_id_node * on (node) group_left kube_node_role{ role = "worker" })`, "{{id}}"),
@@ -258,7 +261,7 @@ func ocpClusterAtAGlanceRow(t panelTracker) *dashboard.RowBuilder {
 		WithPanel(genericLegendCounterTimeSeries("Workers CGroup Memory RSS", "bytes",
 			12, 8,
 			t.track("cgroupMemoryRSSWorker",
-				mg.Q(mg.MetricContainerMemoryRSS, cgroupIDFilter).
+				mg.Q(mg.MetricContainerMemoryRSS, cgroupIDFilter+`,`+workerNodesFilter).
 					MultiplyOnGroupLeft([]mg.GroupBy{mg.GroupByNode},
 						mg.NodeRoleFilter(mg.RoleWorker)).
 					Agg(mg.AggSum, mg.GroupByID),
@@ -810,7 +813,7 @@ func withWorkerNodeDetailRow(builder *dashboard.DashboardBuilder, t panelTracker
 	return builder.WithRow(ocpNodeRow(t, "_worker_node", mg.RoleWorker)).
 		WithVariable(dashboard.NewQueryVariableBuilder("_worker_node").
 			Label("Worker").
-			Query(t.trackVarQuery("workerNodes", `label_values(kube_node_role{role=~"worker"}, node)`)).
+			Query(t.trackVarQuery("workerNodes", `label_values(kube_node_role{`+workerNodesFilter+`}, node)`)).
 			Datasource(promDatasourceRef()).
 			Refresh(dashboard.VariableRefreshOnTimeRangeChanged).
 			Multi(true).
@@ -821,7 +824,7 @@ func withInfraNodeDetailRow(builder *dashboard.DashboardBuilder, t panelTracker)
 	return builder.WithRow(ocpNodeRow(t, "_infra_node", mg.RoleInfra)).
 		WithVariable(dashboard.NewQueryVariableBuilder("_infra_node").
 			Label("Infra").
-			Query(t.trackVarQuery("infraNodes", `label_values(kube_node_role{role="infra"}, node)`)).
+			Query(t.trackVarQuery("infraNodes", `label_values(kube_node_role{node=~"`+infraList+`"}, node)`)).
 			Datasource(promDatasourceRef()).
 			Refresh(dashboard.VariableRefreshOnTimeRangeChanged).
 			Multi(true).
@@ -956,7 +959,7 @@ func ocpNodeRow(t panelTracker, nodeVar string, role mg.NodeRole) *dashboard.Row
 		WithPanel(genericLegendCounterTimeSeries("cgroup RSS: $"+nodeVar, "bytes",
 			12, 8,
 			t.track("cgroupRSS",
-				mg.Q(mg.MetricContainerMemoryRSS, cgroupIDFilterWithJournald+", "+nodeFilter).
+				mg.Q(mg.MetricContainerMemoryRSS, cgroupIDFilter+", "+nodeFilter).
 					Agg(mg.AggSum, mg.GroupByID),
 				"{{ id }}"),
 			promQuery(`container_memory_working_set_bytes_cgroup{`+nodeFilter+`}`, "{{ id }}"),
