@@ -90,6 +90,7 @@ func (d *deployer) discoverDashboards() (map[int][]string, error) {
 		parts := strings.SplitN(rel, string(filepath.Separator), 2)
 
 		var folderName string
+		log.Printf("Folder parts %s for dash %s", parts, path)
 		if len(parts) == 2 {
 			folderName = parts[0]
 		} else {
@@ -111,6 +112,7 @@ func (d *deployer) ensureFolder(name string) (int, error) {
 		return 0, nil
 	}
 	if id, ok := d.folderMap[name]; ok {
+		log.Printf("Returning folder id: %d for folder %s", id, name)
 		return id, nil
 	}
 	return d.createFolder(name)
@@ -144,6 +146,7 @@ func (d *deployer) createFolder(name string) (int, error) {
 }
 
 func (d *deployer) uploadDashboard(jsonPath string, folderID int) error {
+	log.Printf("uploadingDashboard %s at folder %d", jsonPath, folderID)
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {
 		return err
