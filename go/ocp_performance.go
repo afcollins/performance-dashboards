@@ -142,6 +142,8 @@ func ocpBase(t panelTracker, name string, summarize bool) *dashboard.DashboardBu
 				intervalOption("5m"),
 			}),
 		).
+		// Row: max pods and multus
+		WithRow(ocpMaxPodsAndMultusRow(t)).
 		WithRow(ocpClusterAtAGlanceRow(t, summarize)).
 		// Row: OVN
 		WithRow(ocpOVNRow(t, summarize)).
@@ -166,6 +168,59 @@ func ocpBase(t panelTracker, name string, summarize bool) *dashboard.DashboardBu
 
 func buildOCPDashboard(t panelTracker) *dashboard.DashboardBuilder {
 	return ocpBase(t, "OpenShift Performance", false)
+}
+
+// Row: max pods and multus
+func ocpMaxPodsAndMultusRow(t panelTracker) *dashboard.RowBuilder {
+	return dashboard.NewRowBuilder("max pods and multus").
+		Collapsed(true).
+		WithPanel(genericLegendTimeSeries("multus CPU Usage", "percent",
+			12, 8,
+			t.track("multusCPU",
+				mg.Q(mg.MetricContainerCPU, `container="kube-multus",pod=~"multus-.*",namespace="openshift-multus"`).
+					IRate(intervalVar).
+					Multiply("100").
+					Agg(mg.AggSum, mg.GroupByPod, mg.GroupByNode, mg.GroupByID),
+				"{{pod}} - {{node}}"),
+			promQuery(`container_cpu_usage_seconds_total_container_sum_rate_pod_node_container_namespace_name{pod=~"ovnkube-.*",namespace="openshift-ovn-kubernetes",container="ovnkube-controller"}`, "{{pod}} - {{node}}"),
+		)).
+		WithPanel(genericLegendTimeSeries("container threads: multus", "",
+			12, 8,
+			t.track("multusContainerThreads",
+				mg.Q(mg.MetricContainerThreads, `container="kube-multus",namespace="openshift-multus",pod=~"multus-.*"`).
+					Agg(mg.AggSum, mg.GroupByContainer, mg.GroupByPod, mg.GroupByID, mg.GroupByNode),
+				"{{container}} {{pod}} {{node}}"),
+			promQuery(`node_cpu_seconds_sum_rate_2m_30s_instance_mode_node_panel{instance=~"$_worker_node"}`, "Busy {{mode}}"),
+		)).
+		WithPanel(ocpPodCountPanel(t, 12, 8)).
+		WithPanel(ocpPodDistributionPanel(t, 12, 8))
+}
+
+func ocpPodCountPanel(t panelTracker, span, height uint32) *timeseries.PanelBuilder {
+	return genericTimeSeries("Pod count", "none",
+		span, height,
+		t.track("kubePodStatusPhase",
+			mg.Q(mg.MetricKubePodStatusPhase, "").
+				Agg(mg.AggSum, mg.GroupByPhase).
+				Gt("0"),
+			"{{phase}} pods"),
+		promQuery(`kube_pod_status_phase_sum_by_failed`, "Failed pods"),
+		promQuery(`kube_pod_status_phase_sum_by_pending`, "Pending pods"),
+		promQuery(`kube_pod_status_phase_sum_by_running`, "Running pods"),
+		promQuery(`kube_pod_status_phase_sum_by_succeeded`, "Succeeded pods"),
+		promQuery(`kube_pod_status_phase_sum_by_unknown`, "Unknown pods"),
+	)
+}
+
+func ocpPodDistributionPanel(t panelTracker, span, height uint32) *timeseries.PanelBuilder {
+	return genericLegendTimeSeries("Pod Distribution", "none",
+		span, height,
+		t.track("kubePodDistribution",
+			mg.Q(mg.MetricKubePodInfo, "").
+				Agg(mg.AggCount, mg.GroupByNode),
+			"{{ node }}"),
+		promQuery(`kube_pod_info_by_node`, "{{ node }}"),
+	)
 }
 
 // Row: Cluster-at-a-Glance
@@ -763,19 +818,7 @@ func ocpClusterDetailsRow(t panelTracker) *dashboard.RowBuilder {
 				"{{ phase }} namespaces"),
 			promQuery(`kube_namespace_status_phase_sum_by_phase > 0`, "{{ phase }} namespaces"),
 		)).
-		WithPanel(genericTimeSeries("Pod count", "none",
-			8, 8,
-			t.track("kubePodStatusPhase",
-				mg.Q(mg.MetricKubePodStatusPhase, "").
-					Agg(mg.AggSum, mg.GroupByPhase).
-					Gt("0"),
-				"{{phase}} pods"),
-			promQuery(`kube_pod_status_phase_sum_by_failed`, "Failed pods"),
-			promQuery(`kube_pod_status_phase_sum_by_pending`, "Pending pods"),
-			promQuery(`kube_pod_status_phase_sum_by_running`, "Running pods"),
-			promQuery(`kube_pod_status_phase_sum_by_succeeded`, "Succeeded pods"),
-			promQuery(`kube_pod_status_phase_sum_by_unknown`, "Unknown pods"),
-		)).
+		WithPanel(ocpPodCountPanel(t, 8, 8)).
 		WithPanel(genericTimeSeries("Secret & configmap count", "none",
 			8, 8,
 			t.track("kubeSecretInfo", mg.QRaw(mg.MetricKubeSecretInfo).Agg(mg.AggCount), "secrets"),
@@ -807,14 +850,7 @@ func ocpClusterDetailsRow(t panelTracker) *dashboard.RowBuilder {
 					TopK(10),
 				"{{severity}}: {{alertname}}"),
 		)).
-		WithPanel(genericLegendTimeSeries("Pod Distribution", "none",
-			8, 8,
-			t.track("kubePodDistribution",
-				mg.Q(mg.MetricKubePodInfo, "").
-					Agg(mg.AggCount, mg.GroupByNode),
-				"{{ node }}"),
-			promQuery(`kube_pod_info_by_node`, "{{ node }}"),
-		)).
+		WithPanel(ocpPodDistributionPanel(t, 8, 8)).
 		WithPanel(genericLegendTimeSeries("Top 10 container CPU", "percent",
 			12, 8,
 			t.track("containerCPUTop10",
@@ -1044,6 +1080,14 @@ func ocpNodeRow(t panelTracker, nodeVar string, role mg.NodeRole) *dashboard.Row
 					Multiply("100"),
 				"{{ id }}"),
 			promQuery(`container_cpu_usage_seconds_total_cgroup_sum_rate_id_node{`+nodeFilter+`}`, "{{ id }}"),
+		)).
+		WithPanel(genericLegendTimeSeries("container threads: $"+nodeVar, "",
+			12, 8,
+			t.track("containerThreads",
+				mg.Q(mg.MetricContainerThreads, `container!="",`+nodeFilter).
+					Agg(mg.AggSum, mg.GroupByContainer, mg.GroupByPod, mg.GroupByID),
+				"{{container}} {{pod}}"),
+			promQuery(`node_cpu_seconds_sum_rate_2m_30s_instance_mode_node_panel{`+instanceFilter+`}`, "Busy {{mode}}"),
 		)).
 		WithPanel(genericLegendCounterTimeSeries("cgroup RSS: $"+nodeVar, "bytes",
 			12, 8,
