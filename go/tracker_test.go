@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 
 	mg "github.com/afcollins/metrics-generator/pkg/metrics"
@@ -271,6 +273,32 @@ func TestQueryTrackerNoDuplicates(t *testing.T) {
 		if count > 1 {
 			t.Errorf("metric %q appears %d times in aggregated profile (want 1)", name, count)
 		}
+	}
+}
+
+func TestCollectedDashboardRepeaterUsesStaticRecordingRuleNames(t *testing.T) {
+	g := &mg.Generator{}
+	buildOCPDashboard(&queryTracker{g: g})
+	for _, def := range parseProfile(t, g) {
+		if strings.Contains(def.MetricName, "$") {
+			t.Errorf("recording-rule name contains a Grafana variable: %q", def.MetricName)
+		}
+	}
+
+	built, err := buildOCPCollectedDashboard().Build()
+	if err != nil {
+		t.Fatalf("build collected dashboard: %v", err)
+	}
+	jsonBytes, err := json.Marshal(built)
+	if err != nil {
+		t.Fatalf("marshal collected dashboard: %v", err)
+	}
+	output := string(jsonBytes)
+	if strings.Contains(output, "nodeCPU$_cluster_role") {
+		t.Error("collected repeater query contains a Grafana variable in its metric name")
+	}
+	if !strings.Contains(output, `"expr":"nodeCPUByClusterRole{role=\"$_cluster_role\"}"`) {
+		t.Error("collected repeater query did not retain the role filter on nodeCPU")
 	}
 }
 

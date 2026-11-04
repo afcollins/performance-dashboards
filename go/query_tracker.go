@@ -15,6 +15,26 @@ const profileInterval = mg.Rate2m
 
 var grafanaVarRe = regexp.MustCompile(`,?\s*\w+[=!~]+=?"[^"]*\$[^"]*"`)
 var labelValuesRe = regexp.MustCompile(`^label_values\((.+),\s*(\w+)\)$`)
+var grafanaVarNameRe = regexp.MustCompile(`\$(?:\{[a-zA-Z_][a-zA-Z0-9_]*\}|[a-zA-Z_][a-zA-Z0-9_]*)`)
+
+// recordingRuleName replaces Grafana template variables in an internal
+// recording-rule name with a stable descriptive suffix. A repeated panel is
+// rendered once by Grafana for each variable value, so its rule must be one
+// stable metric filtered by that variable rather than a metric whose name
+// contains the template expression. Keeping the variable name in the suffix
+// also avoids colliding with a different, non-repeated rule (for example,
+// nodeCPU and nodeCPUByClusterRole).
+func recordingRuleName(name string) string {
+	return grafanaVarNameRe.ReplaceAllStringFunc(name, func(variable string) string {
+		variable = strings.TrimSuffix(strings.TrimPrefix(variable, "$"), "}")
+		variable = strings.TrimPrefix(variable, "{")
+		parts := strings.FieldsFunc(variable, func(r rune) bool { return r == '_' })
+		for i, part := range parts {
+			parts[i] = strings.ToUpper(part[:1]) + part[1:]
+		}
+		return "By" + strings.Join(parts, "")
+	})
+}
 
 func stripGrafanaVars(expr string) string {
 	clean := grafanaVarRe.ReplaceAllString(expr, "")
@@ -67,19 +87,21 @@ func (t *queryTracker) add(name, stripped string) {
 
 func (t *queryTracker) track(name string, query *mg.Query, legend string) *prometheus.DataqueryBuilder {
 	expr := query.String()
-	t.add(name, stripGrafanaVars(expr))
+	recordName := recordingRuleName(name)
+	t.add(recordName, stripGrafanaVars(expr))
 	if t.useMetricNames {
-		return promQuery(name+extractGrafanaVarFilters(expr), legend)
+		return promQuery(recordName+extractGrafanaVarFilters(expr), legend)
 	}
 	return promQuery(expr, legend)
 }
 
 func (t *queryTracker) trackVarQuery(name string, expr string) dashboard.StringOrMap {
+	recordName := recordingRuleName(name)
 	if m := labelValuesRe.FindStringSubmatch(expr); m != nil {
 		metricExpr, label := strings.TrimSpace(m[1]), m[2]
-		t.add(name, "count("+stripGrafanaVars(metricExpr)+") by ("+label+")")
+		t.add(recordName, "count("+stripGrafanaVars(metricExpr)+") by ("+label+")")
 		if t.useMetricNames {
-			rewritten := "label_values(" + name + ", " + label + ")"
+			rewritten := "label_values(" + recordName + ", " + label + ")"
 			return dashboard.StringOrMap{String: cog.ToPtr(rewritten)}
 		}
 	}
@@ -87,9 +109,10 @@ func (t *queryTracker) trackVarQuery(name string, expr string) dashboard.StringO
 }
 
 func (t *queryTracker) trackRaw(name string, expr string, legend string) *prometheus.DataqueryBuilder {
-	t.add(name, stripGrafanaVars(expr))
+	recordName := recordingRuleName(name)
+	t.add(recordName, stripGrafanaVars(expr))
 	if t.useMetricNames {
-		return promQuery(name+extractGrafanaVarFilters(expr), legend)
+		return promQuery(recordName+extractGrafanaVarFilters(expr), legend)
 	}
 	return promQuery(expr, legend)
 }
